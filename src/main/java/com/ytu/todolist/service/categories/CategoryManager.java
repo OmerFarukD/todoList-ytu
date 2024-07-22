@@ -5,18 +5,24 @@ import com.ytu.todolist.dtos.requests.categories.CategoryAddRequestDto;
 import com.ytu.todolist.dtos.requests.categories.CategoryUpdateRequestDto;
 import com.ytu.todolist.dtos.responses.categories.CategoryResponseDto;
 import com.ytu.todolist.entities.Category;
+import com.ytu.todolist.exceptions.BusinessException;
 import com.ytu.todolist.exceptions.NotFoundException;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Service;
 import java.util.List;
 
+// SOLID
 
 @Service
 public final class CategoryManager implements  CategoryService {
 
     private final CategoryRepository categoryRepository;
+    private final BaseCategoryMapper mapper;
 
-    public CategoryManager(CategoryRepository categoryRepository) {
+    //@Qualifier
+    public CategoryManager(CategoryRepository categoryRepository, @Qualifier("Manuel") BaseCategoryMapper mapper) {
         this.categoryRepository = categoryRepository;
+        this.mapper = mapper;
     }
 
 
@@ -25,7 +31,7 @@ public final class CategoryManager implements  CategoryService {
 
         Category category = this.categoryRepository.findById(id).orElseThrow(()->new NotFoundException(id,"Kategori"));
 
-        CategoryResponseDto response = convertToDto(category);
+        CategoryResponseDto response = mapper.convertToDto(category);
 
         return response;
 
@@ -57,14 +63,17 @@ public final class CategoryManager implements  CategoryService {
         // todo: method reference ve lambda fonksiyonlarını araştırınız.
         return  this.categoryRepository.findAll()
                 .stream()
-                .map(this::convertToDto)
+                .map(mapper::convertToDto)
                 .toList();
     }
 
+
+    // todo: Kategori eklenirken aynı isimde kategori varsa eklemesin.
     @Override
     public String add(CategoryAddRequestDto dto) {
 
-        Category category = convertToEntity(dto);
+
+        Category category =mapper.convertToEntity(dto);
         this.categoryRepository.save(category);
 
         return "Kategori eklendi.";
@@ -78,7 +87,7 @@ public final class CategoryManager implements  CategoryService {
 
        if (isPresent){
 
-           Category category = convertToEntity(dto);
+           Category category = mapper.convertToEntity(dto);
            this.categoryRepository.save(category);
            return "Kategori güncellendi.";
        }
@@ -95,30 +104,11 @@ public final class CategoryManager implements  CategoryService {
         return "Kategori güncellendi.";*/
     }
 
-    // static polyöorphism (OverLoading)
-    private Category convertToEntity(CategoryAddRequestDto dto){
 
-        Category category = new Category();
-        category.setName(dto.name());
-        category.setDescription(dto.description());
-
-        return  category;
+    private  void categoryNameMustBeUnique(String name){
+        int count = this.categoryRepository.countByName(name);
+        if (count>0){
+            throw new BusinessException("Bu isimde bir kategori zaten var :" +name);
+        }
     }
-    private Category convertToEntity(CategoryUpdateRequestDto dto){
-
-        Category category = new Category();
-        category.setId(dto.id());
-        category.setName(dto.name());
-        category.setDescription(dto.description());
-
-        return  category;
-    }
-
-    private CategoryResponseDto convertToDto(Category category){
-        return  new CategoryResponseDto(category.getId(), category.getName(), category.getDescription());
-    }
-
-
-
-
 }
